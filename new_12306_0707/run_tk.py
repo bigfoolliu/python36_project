@@ -1,4 +1,4 @@
-from tkinter.ttk import Button,Entry,Label,Scrollbar,Combobox,Treeview,Checkbutton
+from tkinter.ttk import Button,Entry,Label,Scrollbar,Combobox,Treeview,Checkbutton,Radiobutton
 from tkinter import Label,Listbox,END,StringVar,Tk,EXTENDED,END,IntVar
 from tkinter import messagebox
 from new_12306_0707.get_12306_data import Pro_train
@@ -20,6 +20,8 @@ class App_test(object):
         self.win.mainloop()
 
     def creat_res(self):
+        self.v=IntVar()#车票查询
+        self.v.set(True)
         self.temp=StringVar()#开始站
         self.temp2=StringVar()#目的站
         self.start_mon=StringVar()#出发月
@@ -31,6 +33,8 @@ class App_test(object):
         self.La_endstation=Label(self.win,text="目的站:")
         self.La_time=Label(self.win,text="请选择出发时间-年-月-日",fg="blue")
         self.B_search=Button(self.win,text="搜索")
+        self.R_site=Radiobutton(self.win,text="车票查询",variable=self.v,value=True)
+        self.R_price=Radiobutton(self.win,text="票价查询",variable=self.v,value=False)
         self.B_buy_tick=Button(self.win,text="购票")
         self.C_year=Combobox(self.win,textvariable=self.start_year)
         self.C_mon=Combobox(self.win,textvariable=self.start_mon)
@@ -48,7 +52,9 @@ class App_test(object):
         self.La_s.place(x=80,y=140,width=20,height=30)
         self.B_search.place(x=10,y=180,width=50,height=30)
         self.S_move.place(x=834,y=40,width=30,height=350)
-        self.B_buy_tick.place(x=10,y=230,width=80,height=40)
+        self.B_buy_tick.place(x=10,y=260,width=80,height=40)
+        self.R_site.place(x=10,y=230,width=70,height=30)
+        self.R_price.place(x=90,y=230,width=70,height=30)
 
     def res_config(self):
         self.C_year.config(values=[x for x in range(2018,2020)])
@@ -149,41 +155,56 @@ class App_test(object):
     def manage_date(self):#处理时间，闰年以及当天时间
         self.is_leapyear()
 
+    def change_str(self,mm):
+        for i, j in mm.items():
+            with open("res/dict.txt", mode='r', encoding='utf-8') as f:
+                mes = f.readlines()
+                for s in mes:
+                    d = json.loads(s)
+                    if j[0] in d:
+                        j[0] = d[j[0]]
+                    if j[1] in d:
+                        j[1] = d[j[1]]
+        # print(self.new_train_message) #车次信息
+        non_empty_str = ['']
+        for m, n in mm.items():
+            mm[m] = ['-' if x in non_empty_str else x for x in n]  # 替换''字符为'-'
+        return mm
+
     def trans_train_dic(self):#输出出发站-目的站-名字
         date, start_station, end_station = self.get_train_args()
         print(date, start_station, end_station)
         try:
             p = Pro_train(date, start_station, end_station)
             self.train_message = p.get_train_res()  # 获得车次信息字典 车次英文
+            self.train_tick=p.get_tarin_ticket()#获得票价信息
             # print(self.train_message) #车次信息
             self.new_train_message=self.train_message #复制一份
-            for i,j in self.new_train_message.items():
-                with open("res/dict.txt",mode='r',encoding='utf-8') as f:
-                    mes=f.readlines()
-                    for s in mes:
-                        d=json.loads(s)
-                        if j[0] in d:
-                            j[0]=d[j[0]]
-                        if j[1] in d:
-                            j[1]=d[j[1]]
-            # print(self.new_train_message) #车次信息
-            non_empty_str=['']
-            for m,n in self.new_train_message.items():
-                self.new_train_message[m]=['-' if x in non_empty_str else x for x in n]#替换''字符为'-'
-            # print(self.new_train_message)
-            return self.new_train_message# 中文字典
+            self.new_train_tick=self.train_tick
+            self.new_train_message=self.change_str(self.new_train_message)
+            self.new_train_tick=self.change_str(self.new_train_tick)
+            return self.new_train_message,self.new_train_tick# 中文字典
         except Exception as e:
             # messagebox.showerror(title="警告",message="无法解析数据，请重新选择")
             print("错误码:",e.args)
 
     def search_train_message(self):
         self.manage_date()#处理日期-True-transe-view
-        self.view_list()
+        if self.v.get():
+            self.view_list()
+        else:
+            self.view_price()
+
+    def clear_tree(self):
+        x=self.tree.get_children()
+        for n in x:
+            self.tree.delete(n)
 
     def view_list(self):#显示到网格
         # 车次 出发/站 出发到达时间 历时 商务座31  一等座30 二等座29  高软20 软卧22 动卧 硬卧27 软座23 硬座28 无座25 其他21
         try:
-            self.new_train_message=self.trans_train_dic() #生成新车次字典
+            self.clear_tree()
+            self.new_train_message,x=self.trans_train_dic() #生成新车次字典
             for i,j in self.new_train_message.items():
                 self.tree.insert("","end",values=(i,j[0]+"->"+j[1],j[2]+"->"+j[3],j[4],j[5],j[6],j[7],j[8],j[9],j[10],j[11],
                                                   j[12],j[13],j[14],j[15]))
@@ -191,5 +212,16 @@ class App_test(object):
             # messagebox.showerror(title="警告",message="无法处理数据")
             print("错误:",e.args)
 
+    def view_price(self):
+        print("-------票价ok-------")
+        try:
+            self.clear_tree()
+            y,self.new_train_tick=self.trans_train_dic() #生成新车次字典
+            for i,j in self.new_train_tick.items():
+                self.tree.insert("","end",values=(i,j[0]+"->"+j[1],j[2]+"->"+j[3],j[4],j[5],j[6],j[7],j[8],j[9],j[10],j[11],
+                                                  j[12],j[13],j[14],"-"))
+        except Exception as e:
+            # messagebox.showerror(title="警告",message="无法处理数据")
+            print("错误:",e.args)
 a=App_test()
 # a.add_train_info()
